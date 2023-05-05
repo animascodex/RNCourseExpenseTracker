@@ -1,12 +1,20 @@
-import { useLayoutEffect } from "react";
+import { useContext, useLayoutEffect } from "react";
 import { View, StyleSheet } from "react-native";
 import IconButton from "../components/UI/IconButton";
 import { GlobalStyles } from "../constants/styles";
 import Button from "../components/UI/Button";
+import { ExpensesContext } from "../store/expenses-context";
+import ExpenseForm from "../components/ManageExpense/ExpenseForm";
 
 function ManageExpense({ route, navigation }) {
+  const expenseCtx = useContext(ExpensesContext);
+
   const modifyExpenseId = route.params?.expenseId;
   const isModifying = !!modifyExpenseId;
+
+  const selectedExpense = expenseCtx.expenses.find(
+    (expense) => expense.id == modifyExpenseId
+  );
 
   useLayoutEffect(() => {
     navigation.setOptions({
@@ -15,27 +23,31 @@ function ManageExpense({ route, navigation }) {
   }, [navigation, isModifying]);
 
   function deleteExpenseHandler() {
+    expenseCtx.deleteExpense(modifyExpenseId);
     navigation.goBack();
   }
 
   function cancelHandler() {
     navigation.goBack();
   }
-  function confirmHandler() {
+  function confirmHandler(expenseData) {
+    if (isModifying) {
+      expenseCtx.updateExpense(modifyExpenseId, expenseData);
+    } else {
+      expenseCtx.addExpense(expenseData);
+    }
     navigation.goBack();
   }
 
   return (
     <View style={styles.container}>
-      <View style={styles.buttons}>
-        <Button style={styles.button} mode="flat" onPress={cancelHandler}>
-          Cancel
-        </Button>
-        <Button style={styles.button} onPress={confirmHandler}>
-          {" "}
-          {isModifying ? "Update" : "Add"}
-        </Button>
-      </View>
+      <ExpenseForm
+        submitButtonLabel={isModifying ? "Update" : "Add"}
+        onSubmit={confirmHandler}
+        onCancel={cancelHandler}
+        defaultValues = {selectedExpense}
+      />
+
       {isModifying && (
         <View style={styles.deleteContainer}>
           <IconButton
@@ -57,15 +69,6 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 24,
     backgroundColor: GlobalStyles.colors.primary800,
-  },
-  button: {
-    minWidth: 120,
-    marginHorizontal: 8,
-  },
-  buttons: {
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
   },
   deleteContainer: {
     marginTop: 16,
