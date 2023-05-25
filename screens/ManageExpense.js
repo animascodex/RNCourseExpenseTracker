@@ -1,12 +1,17 @@
-import { useContext, useLayoutEffect } from "react";
+import { useContext, useLayoutEffect, useState } from "react";
 import { View, StyleSheet } from "react-native";
 import IconButton from "../components/UI/IconButton";
 import { GlobalStyles } from "../constants/styles";
-import Button from "../components/UI/Button";
 import { ExpensesContext } from "../store/expenses-context";
 import ExpenseForm from "../components/ManageExpense/ExpenseForm";
+import { storeExpense, updateExpense, deleteExpense } from "../util/http";
+import LoadingOverlay from "../components/UI/LoadingOverlay";
+import ErrorOverlay from "../components/UI/ErrorOverlay";
 
 function ManageExpense({ route, navigation }) {
+  const [isSending, setIsSending] = useState(false);
+  const [error, setError] = useState();
+
   const expenseCtx = useContext(ExpensesContext);
 
   const modifyExpenseId = route.params?.expenseId;
@@ -22,21 +27,44 @@ function ManageExpense({ route, navigation }) {
     });
   }, [navigation, isModifying]);
 
-  function deleteExpenseHandler() {
-    expenseCtx.deleteExpense(modifyExpenseId);
-    navigation.goBack();
+  async function deleteExpenseHandler() {
+    setIsSending(true);
+    try {
+      await deleteExpense(editedExpenseId);
+      expenseCtx.deleteExpense(modifyExpenseId);
+      navigation.goBack();
+    } catch (error) {
+      setError("Could not delete expense - Please try again later!");
+      setIsSending(false);
+    }
   }
 
   function cancelHandler() {
     navigation.goBack();
   }
-  function confirmHandler(expenseData) {
-    if (isModifying) {
-      expenseCtx.updateExpense(modifyExpenseId, expenseData);
-    } else {
-      expenseCtx.addExpense(expenseData);
+  async function confirmHandler(expenseData) {
+    setIsSending(true);
+    try {
+      if (isModifying) {
+        expenseCtx.updateExpense(modifyExpenseId, expenseData);
+        await updateExpense(modifyExpenseId, expenseData);
+      } else {
+        const id = await storeExpense(expenseData);
+        expenseCtx.addExpense({ ...expenseData, id: id });
+      }
+      navigation.goBack();
+    } catch (error) {
+      setError("Could Not Save Data - Please Try Again Later!");
     }
-    navigation.goBack();
+  }
+
+
+  if (error && !isModifying) {
+    return <ErrorOverlay message={error} />;
+  }
+
+  if (isSending) {
+    return <LoadingOverlay />;
   }
 
   return (
@@ -45,7 +73,7 @@ function ManageExpense({ route, navigation }) {
         submitButtonLabel={isModifying ? "Update" : "Add"}
         onSubmit={confirmHandler}
         onCancel={cancelHandler}
-        defaultValues = {selectedExpense}
+        defaultValues={selectedExpense}
       />
 
       {isModifying && (
